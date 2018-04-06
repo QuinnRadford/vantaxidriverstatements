@@ -21,7 +21,7 @@ memconn.executescript(query)
 c = memconn.cursor()
 file=""
 while file == "":
-    print('Enter Report File Name (including file type "example.xml"): ')
+    print('Enter Report File Name (including file type "example.csv"): ')
     file = input()
     if file == "":
         print("No file selected")
@@ -29,7 +29,7 @@ chargesfile=""
 while chargesfile == "":
     print('Enter Charges File Name (including file type "example.csv"): ')
     chargesfile = input()
-    if file == "":
+    if chargesfile == "":
         print("No file selected")
 print('Enter Statement Note/Reason or ENTER to skip: ')
 statementnote = input()
@@ -37,7 +37,7 @@ if statementnote == "":
     statementnote = "None"
     print("Note Skipped.")
 
-idpattern = re.compile('(\d\d*)')
+idpattern = re.compile(r'(\d\d*)')
 
 optiontree = ET.parse('config/options.xml')
 optionroot = optiontree.getroot()
@@ -80,9 +80,6 @@ nightvanleases = {
 #get tcar lease rates
 tcarlease = optionroot.find("leases").find("tcar").text
 
-tree = ET.parse(file)
-root = tree.getroot()
-
 #get car owners
 ownerlist = {}
 with open('config/owner_id.csv') as ownerids:
@@ -98,44 +95,46 @@ with open('config/owner_id.csv') as ownerids:
                     'day' : owneridvals[1],
                     'night' : owneridvals[3]}
 
-#insert xml into db
-for detail in root.findall('{urn:crystal-reports:schemas:report-detail}Details'):
-    car = detail[0][0][0].text
-    timeonstring = detail[0][1][0].text
-    driverstring = detail[0][3][0].text
-    timeoffstring = detail[0][2][0].text
-    drivername = re.sub(r'(\d\d* \- )', ' ', driverstring)
-    if(timeonstring != '-'):
-        datetimeon = datetime.strptime(timeonstring, '%d %b %Y, %H:%M')
-        if(timeoffstring == '-'):
-            datetimeoff = datetimeon + timedelta(hours=8)
-            print('logoff out of range, set to ' + str(datetimeoff) + ' for ' + drivername)
-        else:
-            datetimeoff = datetime.strptime(timeoffstring, '%d %b %Y, %H:%M')
-        driverid = idpattern.match(driverstring).group(0)
-        houron = datetimeon.hour
-        houroff = datetimeoff.hour
-        shiftlength = datetimeoff - datetimeon
-        if houron > houroff:
-            shifttype = 1 #night
-        elif houron <= 4 and houroff <= 6 and shiftlength.seconds > 7200:
-            #shift to yesterday
-            datetimeon = datetimeon - timedelta(days=1)
-            datetimeoff = datetimeoff - timedelta(days=1)
-            shifttype = 1 #night
-        elif houron <= 6 and houroff <= 6:
-            shifttype = 3 #toss
-        elif houron <= 6 and houroff >= 6 and shiftlength.seconds > 7200:
-            shifttype = 0 #day
-        elif houron >= 6 and houroff <= 17 and shiftlength.seconds > 7200:
-            shifttype = 0 #day
-        elif shiftlength.seconds > 7200:
-            shifttype = 1 #night
-        else:
-            shifttype = 2 #toss
-        
-        c.execute('INSERT INTO Shifts (DriverID, Car, Start, End, Type, Date, Length, DriverName) VALUES ("' + driverid + '", "' + car + '", ' + str(int(datetimeon.timestamp())) + ', ' +str(int(datetimeoff.timestamp())) + ', ' + str(shifttype) + ', ' + str(datetimeon.year) + str(datetimeon.month).zfill(2) + str(datetimeon.day).zfill(2) + ', ' + str(shiftlength.seconds) + ', "' + str(drivername) + '");')
-print("XML Okay!")
+#insert csv into db
+with open(file) as shiftrows:
+    for cnt, line in enumerate(shiftrows):
+        thisshiftrow = line.split(r'","')
+        car = thisshiftrow[6]
+        timeonstring = thisshiftrow[8]
+        driverstring = thisshiftrow[7]
+        timeoffstring = thisshiftrow[9]
+        drivername = re.sub(r'(\d\d* \- )', ' ', driverstring)
+        if(timeonstring != '-'):
+            datetimeon = datetime.strptime(timeonstring, '%d %b %Y, %H:%M')
+            if(timeoffstring == '-'):
+                datetimeoff = datetimeon + timedelta(hours=8)
+                print('logoff out of range, set to ' + str(datetimeoff) + ' for ' + drivername)
+            else:
+                datetimeoff = datetime.strptime(timeoffstring, '%d %b %Y, %H:%M')
+            driverid = idpattern.match(driverstring).group(0)
+            houron = datetimeon.hour
+            houroff = datetimeoff.hour
+            shiftlength = datetimeoff - datetimeon
+            if houron > houroff:
+                shifttype = 1 #night
+            elif houron <= 4 and houroff <= 6 and shiftlength.seconds > 7200:
+                #shift to yesterday
+                datetimeon = datetimeon - timedelta(days=1)
+                datetimeoff = datetimeoff - timedelta(days=1)
+                shifttype = 1 #night
+            elif houron <= 6 and houroff <= 6:
+                shifttype = 3 #toss
+            elif houron <= 6 and houroff >= 6 and shiftlength.seconds > 7200:
+                shifttype = 0 #day
+            elif houron >= 6 and houroff <= 17 and shiftlength.seconds > 7200:
+                shifttype = 0 #day
+            elif shiftlength.seconds > 7200:
+                shifttype = 1 #night
+            else:
+                shifttype = 2 #toss
+            
+            c.execute('INSERT INTO Shifts (DriverID, Car, Start, End, Type, Date, Length, DriverName) VALUES ("' + driverid + '", "' + car + '", ' + str(int(datetimeon.timestamp())) + ', ' +str(int(datetimeoff.timestamp())) + ', ' + str(shifttype) + ', ' + str(datetimeon.year) + str(datetimeon.month).zfill(2) + str(datetimeon.day).zfill(2) + ', ' + str(shiftlength.seconds) + ', "' + str(drivername) + '");')
+print("Shifts CSV Okay!")
 
 #get the start and end dates
 c.execute('select min(Start) from Shifts;')
