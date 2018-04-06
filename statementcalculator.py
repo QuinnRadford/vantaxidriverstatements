@@ -474,9 +474,12 @@ for driver in driverrows:
     thistemplate = thistemplate.replace('$LEASE_TOTAL', str(Decimal(totalvalue).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
     thistemplate = thistemplate.replace('$TOTAL_BALANCE', str(Decimal(totalchargevalue - totalvalue).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
     thistemplatefilename = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.html'
+    thistemplatefilenamepdf = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.pdf'
     thistemplatefile = open(thistemplatefilename, 'w')
     thistemplatefile.write(thistemplate)
     thistemplatefile.close()
+    #write pdf version of operator statement
+    pdfkit.from_file(thistemplatefilename, thistemplatefilenamepdf,options = options, configuration = config)
     
 
 driverdata.write(csvheader + alldriverdata)
