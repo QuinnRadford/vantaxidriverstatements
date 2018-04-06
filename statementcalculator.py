@@ -9,6 +9,13 @@ from datetime import timezone
 from decimal import Decimal
 from decimal import ROUND_HALF_DOWN
 import pdfkit
+
+def formatCharges(chargeval):
+    if chargeval < 0:
+        return '($' + str(Decimal(chargeval*int(-1)).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + ')'
+    else:
+        return '$' + str(Decimal(chargeval).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;'
+
 path_wkthmltopdf = r'wkhtmltopdf\bin\wkhtmltopdf.exe'
 config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
 options = {
@@ -339,6 +346,9 @@ cartemplatestring = ""
 cartemplatefile = open('templates/car-template.html', 'r')
 cartemplatestring = cartemplatefile.read()
 
+driverPdfIndex = 0
+totalDriverPdf = len(driverrows)
+print("Writing Operator statements, this may take some time..")
 #collapse shifts for each driver
 for driver in driverrows:
     #c.execute('select Charge, Credit from Charges where DriverID = ' + str(driver) + ';')
@@ -350,19 +360,17 @@ for driver in driverrows:
     chargeoutput = ""
     if chargerow != None:
         for cnt, chargeval in enumerate(chargerow):
-            if cnt > 0 and chargeval != '':
+            if cnt > 2 and chargeval != '':
                 totalchargevalue += chargeval
-                if chargeval < 0:
-                    chargetext = '($' + str(Decimal(chargeval*int(-1)).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + ')'
-                else:
-                    chargetext = '$' + str(Decimal(chargeval).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;'
-                chargeoutput += '<tr><td>' + chargeheader[cnt] + '</td><td>' + chargetext + '</td></tr>'
-        creditcard = chargerow[1]
-        charges = chargerow[0]
-        
+                chargeoutput += '<tr><td>' + chargeheader[cnt] + '</td><td>' + formatCharges(chargeval) + '</td></tr>'
+        balancein = chargerow[1]
+        balanceout = chargerow[2]
+        chargeoutput += '<tr><td>Balance Forward</td><td>' + formatCharges(balancein) + '</td></tr>'
+        #add balance forward to total
+        totalchargevalue += balancein
     else:
-        creditcard = 0
-        charges = 0
+        balancein = 0
+        balanceout = 0
     driverID = ""
     drivername = ""
     thistemplate = ""
@@ -473,6 +481,10 @@ for driver in driverrows:
     thistemplate = thistemplate.replace('$CHARGE_ROWS', chargeoutput)
     thistemplate = thistemplate.replace('$LEASE_TOTAL', str(Decimal(totalvalue).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
     thistemplate = thistemplate.replace('$TOTAL_BALANCE', str(Decimal(totalchargevalue - totalvalue).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
+    thistemplate = thistemplate.replace('$TO_DRIVER', str(Decimal(totalchargevalue - totalvalue - balanceout).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
+    thistemplate = thistemplate.replace('$ACCOUNT_BALANCE', str(Decimal(balanceout).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
+    if balanceout > balancein:
+        thistemplate = thistemplate.replace('$ACCOUNT_NOTES','Your minimum account balance (deposit) has been increased by $' + str(Decimal(balanceout - balancein).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
     thistemplatefilename = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.html'
     thistemplatefilenamepdf = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.pdf'
     thistemplatefile = open(thistemplatefilename, 'w')
@@ -480,6 +492,8 @@ for driver in driverrows:
     thistemplatefile.close()
     #write pdf version of operator statement
     pdfkit.from_file(thistemplatefilename, thistemplatefilenamepdf,options = options, configuration = config)
+    print('Writing Operator Statement ' + str(driverPdfIndex) + ' of ' + str(totalDriverPdf))
+    driverPdfIndex += 1
     
 
 driverdata.write(csvheader + alldriverdata)
@@ -488,7 +502,7 @@ templatefile.close()
 driverdata.close()
 c.close()
 memconn.close()
-print("Writing statements, this may take some time..")
+print("Writing Car statements, this may take some time..")
 #write car statements
 progress = 1
 totalstatements = len(carrows.items())
@@ -511,7 +525,7 @@ for car, shifts in carrows.items():
     carthistemplatefile.close()
     
     pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config)
-    print("Written file " + str(progress) + " of " + str(totalstatements))
+    print("Written car statement " + str(progress) + " of " + str(totalstatements))
     progress += 1
 
 print("all done!")
