@@ -1,0 +1,118 @@
+<html>
+<head>
+<title>Driver Statement for $DRIVER_NAME</title>
+<style>
+table{
+width:100%!important;
+}
+tfoot{
+  width:100%!important;
+}
+
+.boxed{
+  padding:15px;
+}
+.shiftcontent tr:last-child td{
+  border-bottom: 1px solid black;
+}
+.totalcontent tr td:nth-child(2){
+  border-bottom: 1px solid black;
+}
+.totalcontent tr td:first-child{
+  font-weight: bold;
+}
+.shiftcontent tr td{
+  text-transform: uppercase;
+}
+.shiftcontent tr:first-child td{
+  text-transform: uppercase;
+  font-weight: bold;
+  border-bottom: 1px solid black;
+}
+.totalcontent tr td{
+    text-align: right;
+}
+.rightalign{
+  text-align: right;
+}
+.totalcontent tr:last-child td:last-child{
+  border-bottom: none;
+  border-top: 2px double black;
+}
+tbody tr td:first-child{
+  width:60%;
+}
+tbody tr td:last-child{
+  width:30%;
+}
+table.totalcontent tr td:first-child{
+  width:60%;
+}
+table.totalcontent tr td:last-child{
+  width:30%;
+}
+.heading-row div:first-child{
+  float:left;
+}
+.heading-row div:last-child{
+  float:right;
+}
+td{
+  font-family:Consolas,Monaco,Lucida Console,Liberation Mono,DejaVu Sans Mono,Bitstream Vera Sans Mono,Courier New, monospace;
+}
+</style>
+</head>
+<body>
+  <div class="heading-row">
+<div>
+    <img src="img/logo.png" height="50px">
+    <br/>
+    <p>790 Clark Dr<br/>
+     Vancouver, BC<br/>
+    V5L 3J2<br/></p>
+</div>
+<div>
+    <h1>OPERATOR STATEMENT</h1>
+</div>
+</div>
+<table>
+<thead>
+  <tr>
+    <td class="boxed">
+      <p>
+        <b>Driver Name: <b>$DRIVER_NAME<br/>
+        <b>Driver Number: <b>$DRIVER_NUMBER<br/>
+          <b>Report Range:</b>
+        <p>$DATERANGE</p><br/>
+        <b>Note:</b>
+        <p>$STATEMENT_NOTE</p><br/>
+      </p>
+  </td>
+  <td></td>
+  </tr>
+</thead>
+<tbody class="shiftcontent">
+      $SHIFT_DATA
+</tbody>
+</table>
+<table class="totalcontent">
+    <tr>
+      <td>
+        Total Lease
+      </td>
+      <td>
+        ($$LEASE_TOTAL)
+      </td>
+    </tr>
+    $CHARGE_ROWS
+    <tr>
+      <td>
+        Total Balance
+      </td>
+      <td>
+        $$TOTAL_BALANCE
+      </td>
+    </tr>
+</table>
+</body>
+</html>

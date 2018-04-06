@@ -1,0 +1,26 @@
+<?xml version="1.0"?>
+<data>
+<leases>
+  <sedan>
+    <day>110</day>
+    <monday>95</monday>
+    <tuesday>100</tuesday>
+    <wednesday>100</wednesday>
+    <thursday>120</thursday>
+    <friday>200</friday>
+    <saturday>200</saturday>
+    <sunday>95</sunday>
+  </sedan>
+  <van>
+    <day>100</day>
+    <monday>75</monday>
+    <tuesday>80</tuesday>
+    <wednesday>80</wednesday>
+    <thursday>100</thursday>
+    <friday>180</friday>
+    <saturday>180</saturday>
+    <sunday>75</sunday>
+  </van>
+  <tcar>230</tcar>
+</leases>
+</data>
