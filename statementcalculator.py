@@ -365,7 +365,7 @@ for driver in driverrows:
                 chargeoutput += '<tr><td>' + chargeheader[cnt] + '</td><td>' + formatCharges(chargeval) + '</td></tr>'
         balancein = chargerow[1]
         balanceout = chargerow[2]
-        chargeoutput += '<tr><td>Balance Forward</td><td>' + formatCharges(balancein) + '</td></tr>'
+        chargeoutput += '<tr><td>Previous Account Balance</td><td>' + formatCharges(balancein) + '</td></tr>'
         #add balance forward to total
         totalchargevalue += balancein
     else:
@@ -481,7 +481,8 @@ for driver in driverrows:
     thistemplate = thistemplate.replace('$CHARGE_ROWS', chargeoutput)
     thistemplate = thistemplate.replace('$LEASE_TOTAL', str(Decimal(totalvalue).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
     thistemplate = thistemplate.replace('$TOTAL_BALANCE', str(Decimal(totalchargevalue - totalvalue).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
-    thistemplate = thistemplate.replace('$TO_DRIVER', str(Decimal(totalchargevalue - totalvalue - balanceout).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
+    thistemplate = thistemplate.replace('$TO_DRIVER1', str((Decimal(totalchargevalue - totalvalue - balanceout)/2).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
+    thistemplate = thistemplate.replace('$TO_DRIVER2', str(Decimal((totalchargevalue - totalvalue - balanceout)/2).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
     thistemplate = thistemplate.replace('$ACCOUNT_BALANCE', str(Decimal(balanceout).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
     if balanceout > balancein:
         thistemplate = thistemplate.replace('$ACCOUNT_NOTES','Your minimum account balance (deposit) has been increased by $' + str(Decimal(balanceout - balancein).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')

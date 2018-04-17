@@ -133,139 +133,14 @@ driverdata = open(driverfile, 'w')
 
 csvheader = 'DriverID, Car, Type, Date, Length, Value, DriverName \n'
 
-#lease values
-
-cartypes = {
-    "1":0,
-    "2":0,
-    "3":0,
-    "4":0,
-    "5":0,
-    "6":0,
-    "7":0,
-    "8":0,
-    "9":0,
-    "10":0,
-    "11":0,
-    "12":0,
-    "13":0,
-    "15":0,
-    "16":0,
-    "17":0,
-    "18":0,
-    "20":0,
-    "22":0,
-    "23":0,
-    "25":0,
-    "26":0,
-    "29":0,
-    "30":1,
-    "31":1,
-    "32":1,
-    "33":1,
-    "34":1,
-    "35":1,
-    "36":1,
-    "37":1,
-    "38":1,
-    "39":1,
-    "40":1,
-    "41":1,
-    "42":1,
-    "43":1,
-    "44":1,
-    "45":1,
-    "46":1,
-    "47":1,
-    "48":1,
-    "49":1,
-    "50":1,
-    "51":1,
-    "53":1,
-    "54":1,
-    "55":1,
-    "56":1,
-    "57":1,
-    "58":1,
-    "59":1,
-    "60":1,
-    "62":1,
-    "63":0,
-    "66":0,
-    "67":0,
-    "69":0,
-    "71":1,
-    "74":0,
-    "76":0,
-    "77":0,
-    "79":1,
-    "81":1,
-    "88":0,
-    "90":0,
-    "91":0,
-    "94":1,
-    "98":0,
-    "99":0,
-    "100":0,
-    "101":1,
-    "102":1,
-    "104":0,
-    "107":0,
-    "110":0,
-    "111":0,
-    "116":1,
-    "157":0,
-    "170":1,
-    "200":0,
-    "201":0,
-    "202":0,
-    "203":0,
-    "204":0,
-    "205":0,
-    "206":0,
-    "207":0,
-    "208":0,
-    "209":0,
-    "210":0,
-    "211":0,
-    "212":0,
-    "213":0,
-    "214":0,
-    "215":0,
-    "216":0,
-    "217":0,
-    "218":0,
-    "219":0,
-    "220":0,
-    "221":0,
-    "222":0,
-    "223":0,
-    "224":0,
-    "225":0,
-    "226":1,
-    "227":1,
-    "228":1,
-    "229":1,
-    "230":1,
-    "231":0,
-    "700":2,
-    "701":2,
-    "702":2,
-    "703":2,
-    "704":2,
-    "705":2,
-    "706":2,
-    "707":2,
-    "708":2,
-    "709":2,
-    "710":2,
-    "711":2,
-    "712":2,
-    "713":2,
-    "715":2,
-    "717":2,
-    "719":2,
-    }
+#get the car types (van or sedan or hybrid)
+cartypes = {}
+with open('/config/cartypes.csv') as cartype:
+    #read line by line
+    for cnt, line in enumerate(cartype):
+        cartypevalues = line.split(",")
+        if cnt > 0:
+            cartypes[cartypevalues[0]] = cartypevalues[1]
 
 #get all the dates in range
 c.execute('select distinct Date from Shifts')
@@ -349,6 +224,17 @@ for car in carrows:
                 cartypestring = "T"
                 shiftType = 'TCAR'
                 shiftvalue = tcarlease
+            if cartypes[thiscar] == 3:
+                #non hybrid sedan
+                cartypestring = "C"
+                if types[0] == 0:
+                    shiftType = 'DAY'
+                    shiftvalue = 85
+                elif types[0] == 1:
+                    shiftType = 'NIGHT'
+                    shiftvalue = nightsedanleases[weekday]
+                else:
+                    print("shift type error!")
             else:
                 shiftType = 'ERROR'
                 print("car type error!")

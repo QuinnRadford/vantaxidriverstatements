@@ -82,10 +82,10 @@ td{
       <p>
         <b>Driver Name: <b>$DRIVER_NAME<br/>
         <b>Driver Number: <b>$DRIVER_NUMBER<br/>
-          <b>Report Range:</b>
-        <p>$DATERANGE</p><br/>
-        <b>Note:</b>
-        <p>$STATEMENT_NOTE</p><br/>
+          <b>Report Range:</b><br/>
+        <b>$DATERANGE</b><br/>
+        <b>Note:</b><br/>
+        <b>$STATEMENT_NOTE</b><br/>
       </p>
   </td>
   <td></td>
@@ -107,7 +107,7 @@ td{
     $CHARGE_ROWS
     <tr>
       <td>
-        Transactions Total
+        Total
       </td>
       <td>
         $$TOTAL_BALANCE
@@ -118,23 +118,23 @@ td{
 <table class="totalcontent">
   <tr>
     <td>
-      Transactions
+      Transfer To Operator (1/2)
     </td>
     <td>
-      $$TOTAL_BALANCE
-    </td>
-  </tr>
-  <tr>
-    <td>
-      Operator Withdrawl
-    </td>
-    <td>
-      ($$TO_DRIVER)
+      ($$TO_DRIVER1)
     </td>
   </tr>
   <tr>
     <td>
-      Final Account Balance
+      Transfer To Operator (2/2)
+    </td>
+    <td>
+      ($$TO_DRIVER2)
+    </td>
+  </tr>
+  <tr>
+    <td>
+      Minimum Account Balance
     </td>
     <td>
       $$ACCOUNT_BALANCE

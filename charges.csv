@@ -1,4 +1,4 @@
-ID,Balance Forward,Account Balance,Charges,Credit Card,Tickets
+ID,Previous Account Balance,Account Balance,Deposited Charges,Deposited Credit Card,Tickets or Fines
 1,400,400,2,12,40
 2,400,400,3,4,40
 3,400,400,3,3,40
