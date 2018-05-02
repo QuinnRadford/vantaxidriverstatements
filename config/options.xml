@@ -2,9 +2,9 @@
 <data>
 <leases>
   <sedan>
-    <day>110</day>
+    <day>95</day>
     <monday>95</monday>
-    <tuesday>100</tuesday>
+    <tuesday>95</tuesday>
     <wednesday>100</wednesday>
     <thursday>120</thursday>
     <friday>200</friday>
@@ -12,14 +12,14 @@
     <sunday>95</sunday>
   </sedan>
   <van>
-    <day>100</day>
-    <monday>75</monday>
+    <day>85</day>
+    <monday>80</monday>
     <tuesday>80</tuesday>
-    <wednesday>80</wednesday>
+    <wednesday>85</wednesday>
     <thursday>100</thursday>
     <friday>180</friday>
     <saturday>180</saturday>
-    <sunday>75</sunday>
+    <sunday>80</sunday>
   </van>
   <tcar>230</tcar>
 </leases>

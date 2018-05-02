@@ -105,6 +105,7 @@ with open('config/owner_id.csv') as ownerids:
 #insert csv into db
 with open(file) as shiftrows:
     for cnt, line in enumerate(shiftrows):
+        shifttype = 2
         thisshiftrow = line.split(r'","')
         car = thisshiftrow[6]
         timeonstring = thisshiftrow[8]
@@ -124,7 +125,7 @@ with open(file) as shiftrows:
             shiftlength = datetimeoff - datetimeon
             if houron > houroff:
                 shifttype = 1 #night
-            elif houron <= 4 and houroff <= 6 and shiftlength.seconds > 7200:
+            elif houron <= 3 and houroff <= 5 and shiftlength.seconds > 7200:
                 #shift to yesterday
                 datetimeon = datetimeon - timedelta(days=1)
                 datetimeoff = datetimeoff - timedelta(days=1)
@@ -132,6 +133,8 @@ with open(file) as shiftrows:
             elif houron <= 6 and houroff <= 6:
                 shifttype = 3 #toss
             elif houron <= 6 and houroff >= 6 and shiftlength.seconds > 7200:
+                shifttype = 0 #day
+            elif houron >= 6 and shiftlength.seconds < 43200 and shiftlength.seconds > 7200:
                 shifttype = 0 #day
             elif houron >= 6 and houroff <= 17 and shiftlength.seconds > 7200:
                 shifttype = 0 #day
@@ -486,6 +489,8 @@ for driver in driverrows:
     thistemplate = thistemplate.replace('$ACCOUNT_BALANCE', str(Decimal(balanceout).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
     if balanceout > balancein:
         thistemplate = thistemplate.replace('$ACCOUNT_NOTES','Your minimum account balance (deposit) has been increased by $' + str(Decimal(balanceout - balancein).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
+    else:
+        thistemplate = thistemplate.replace('$ACCOUNT_NOTES',' ')
     thistemplatefilename = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.html'
     thistemplatefilenamepdf = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.pdf'
     thistemplatefile = open(thistemplatefilename, 'w')
