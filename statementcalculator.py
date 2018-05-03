@@ -9,6 +9,7 @@ from datetime import timezone
 from decimal import Decimal
 from decimal import ROUND_HALF_DOWN
 import pdfkit
+from pprint import pprint
 
 def formatCharges(chargeval):
     if chargeval < 0:
@@ -102,10 +103,15 @@ with open('config/owner_id.csv') as ownerids:
                     'day' : owneridvals[1],
                     'night' : owneridvals[3]}
 
+#Service Hours Log
+serviceHours = 'Logon,Logoff,Driver,ID,Length in hours\r'
+
 #insert csv into db
 with open(file) as shiftrows:
     for cnt, line in enumerate(shiftrows):
         shifttype = 2
+        houron = 0
+        houroff = 0
         thisshiftrow = line.split(r'","')
         car = thisshiftrow[6]
         timeonstring = thisshiftrow[8]
@@ -115,27 +121,36 @@ with open(file) as shiftrows:
         if(timeonstring != '-'):
             datetimeon = datetime.strptime(timeonstring, '%d %b %Y, %H:%M')
             if(timeoffstring == '-'):
-                datetimeoff = datetimeon + timedelta(hours=8)
-                print('logoff out of range, set to ' + str(datetimeoff) + ' for ' + drivername)
+                datetimeoff = datetimeon + timedelta(hours=6)
+                #print('logoff out of range, set to ' + str(datetimeoff) + ' for ' + drivername)
             else:
                 datetimeoff = datetime.strptime(timeoffstring, '%d %b %Y, %H:%M')
             driverid = idpattern.match(driverstring).group(0)
             houron = datetimeon.hour
             houroff = datetimeoff.hour
             shiftlength = datetimeoff - datetimeon
-            if houron > houroff:
+
+            if houron > houroff and shiftlength.seconds < 46800:
                 shifttype = 1 #night
             elif houron <= 3 and houroff <= 5 and shiftlength.seconds > 7200:
                 #shift to yesterday
                 datetimeon = datetimeon - timedelta(days=1)
                 datetimeoff = datetimeoff - timedelta(days=1)
                 shifttype = 1 #night
+            elif houron >= 0 and houron <= 9 and shiftlength.seconds > 46800:
+                serviceHours += str(datetimeon) + ',' + str(datetimeoff) + ','  + drivername + ',' + driverid + ',' + str(shiftlength.seconds/3600) + '\r'
+                print('Illegal Hours Of Service on ' + str(datetimeon) + ' for ' + drivername + ' after ' + str(shiftlength.seconds/3600) + 'hours')
+                shifttype = 0 #day
+            elif shiftlength.seconds > 46800:
+                serviceHours += str(datetimeon) + ',' + str(datetimeoff) + ',' + drivername + ',' + driverid + ',' + str(shiftlength.seconds/3600) + '\r'
+                print('Illegal Hours Of Service on ' + str(datetimeon) + ' for ' + drivername + ' after ' + str(shiftlength.seconds/3600) + 'hours')
+                shifttype = 1 #night
             elif houron <= 6 and houroff <= 6:
                 shifttype = 3 #toss
             elif houron <= 6 and houroff >= 6 and shiftlength.seconds > 7200:
                 shifttype = 0 #day
-            elif houron >= 6 and shiftlength.seconds < 43200 and shiftlength.seconds > 7200:
-                shifttype = 0 #day
+            #elif houron >= 6 and shiftlength.seconds < 43200 and shiftlength.seconds > 7200:
+                #shifttype = 0 #day
             elif houron >= 6 and houroff <= 17 and shiftlength.seconds > 7200:
                 shifttype = 0 #day
             elif shiftlength.seconds > 7200:
@@ -145,7 +160,11 @@ with open(file) as shiftrows:
             
             c.execute('INSERT INTO Shifts (DriverID, Car, Start, End, Type, Date, Length, DriverName) VALUES ("' + driverid + '", "' + car + '", ' + str(int(datetimeon.timestamp())) + ', ' +str(int(datetimeoff.timestamp())) + ', ' + str(shifttype) + ', ' + str(datetimeon.year) + str(datetimeon.month).zfill(2) + str(datetimeon.day).zfill(2) + ', ' + str(shiftlength.seconds) + ', "' + str(drivername) + '");')
 print("Shifts CSV Okay!")
-
+#Write Log file
+servicelogname = 'serviceLog' + file.replace('.', '_').replace('/', '_') + '.csv'
+servicelog = open(servicelogname, 'w')
+servicelog.write(serviceHours)
+servicelog.close()
 #get the start and end dates
 c.execute('select min(Start) from Shifts;')
 startdate = c.fetchone()
