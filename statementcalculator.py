@@ -90,6 +90,7 @@ tcarlease = optionroot.find("leases").find("tcar").text
 
 #get car owners
 ownerlist = {}
+c.execute('CREATE TABLE Exemptions (driverID, car, shift);')
 with open('config/owner_id.csv') as ownerids:
     #read line by line
     for cnt, line in enumerate(ownerids):
@@ -97,11 +98,7 @@ with open('config/owner_id.csv') as ownerids:
         if cnt == 0:
             print('Reading Owner IDs')
         else:
-            ownerlist[
-                str(owneridvals[0])
-                ] = {
-                    'day' : owneridvals[1],
-                    'night' : owneridvals[3]}
+            c.execute('INSERT INTO Exemptions (driverID, car, shift) VALUES (' + owneridvals[1] + ', ' + owneridvals[0] + ', ' + owneridvals[3] + ')')
 
 #Service Hours Log
 serviceHours = 'Logon,Logoff,Driver,ID,Length in hours\r'
@@ -151,7 +148,7 @@ with open(file) as shiftrows:
                 shifttype = 0 #day
             #elif houron >= 6 and shiftlength.seconds < 43200 and shiftlength.seconds > 7200:
                 #shifttype = 0 #day
-            elif houron >= 6 and houroff <= 17 and shiftlength.seconds > 7200:
+            elif houron >= 3 and houron <= 14 and houroff <= 17 and shiftlength.seconds > 7200:
                 shifttype = 0 #day
             elif shiftlength.seconds > 7200:
                 shifttype = 1 #night
@@ -411,8 +408,8 @@ for driver in driverrows:
         shiftType = ""
         cartypestring = ""
         carList = {}
-        
-        for row in c.fetchall() or []:
+        theseResults = c.fetchall()
+        for row in theseResults or []:
             if row[3] < 2:
                 types.append(row[3])
                 shifttime += row[4]
@@ -474,14 +471,11 @@ for driver in driverrows:
                 else:
                     shiftType = 'ERROR'
                     print("car type error!")
+
                 #check if the owner is driving
-                if thiscar not in ownerlist:
-                    shiftvalue = 0
-                    ownernums += 1
-                elif carList[carname]['type'] == 0 and int(ownerlist[thiscar]['day']) == int(driver):
-                    shiftvalue = 0
-                    ownernums += 1
-                elif carList[carname]['type'] == 1 and int(ownerlist[thiscar]['night']) == int(driver):
+                c.execute('select * from Exemptions where car = ' + str(thiscar) + ' AND driverID = ' + str(driver) +';')
+                thisOnwer = c.fetchall()
+                if len(thisOnwer) != 0:
                     shiftvalue = 0
                     ownernums += 1
                 output = str(driver) + ', ' + str(thiscar) + ', ' + str(carList[carname]['type']) +', '+ str(date) +', '+ str(round(((shifttime/60)/60), 2)) + ', ' + str(shiftvalue) + ', ' + driversname[0] + '\n'
@@ -528,29 +522,52 @@ driverdata.close()
 c.close()
 memconn.close()
 print("Writing Car statements, this may take some time..")
-#write car statements
+#write day car shifts
 progress = 1
 totalstatements = len(carrows.items())
 for car, shifts in carrows.items():
     leasetotal = 0
     shiftoutput = '<tr><td>' + str('CAR').ljust(10).replace(' ', '&nbsp;') + str('DRIVER').ljust(30).replace(' ', '&nbsp;') + str('DATE').ljust(15).replace(' ', '&nbsp;') + str('SHIFT').ljust(12).replace(' ', '&nbsp;') + '</td><td></td></tr>'
     for shift in shifts:
-        leasetotal += int(shift['value'])
-        shiftoutput += '<tr><td>' + shift['car'].ljust(10).replace(' ', '&nbsp;') + shift['driver'].ljust(8).replace(' ', '&nbsp;') + shift['name'].ljust(22).replace(' ', '&nbsp;') + shift['date'].ljust(15).replace(' ', '&nbsp;') + shift['shift'].ljust(10).replace(' ', '&nbsp;') +'</td><td class="rightalign">$' + shift['value'] + '.00</td></tr>'
+        if shift['shift'] == 'DAY':
+            leasetotal += int(shift['value'])
+            shiftoutput += '<tr><td>' + shift['car'].ljust(10).replace(' ', '&nbsp;') + shift['driver'].ljust(8).replace(' ', '&nbsp;') + shift['name'].ljust(22).replace(' ', '&nbsp;') + shift['date'].ljust(15).replace(' ', '&nbsp;') + shift['shift'].ljust(10).replace(' ', '&nbsp;') +'</td><td class="rightalign">$' + shift['value'] + '.00</td></tr>'
     carthistemplate = cartemplatestring
     carthistemplate = carthistemplate.replace('$DATERANGE', daterange)
     carthistemplate = carthistemplate.replace('$STATEMENT_NOTE', str(statementnote))
     carthistemplate = carthistemplate.replace('$CAR_NAME', car)
     carthistemplate = carthistemplate.replace('$SHIFT_DATA', shiftoutput)
     carthistemplate = carthistemplate.replace('$LEASE_TOTAL', str(Decimal(leasetotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
-    carthistemplatefilename = 'statements/car/' + str(car) + '_statement_' + file.replace('.', '_') + '.html'
-    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_statement_' + file.replace('.', '_') + '.pdf'
+    carthistemplatefilename = 'statements/car/' + str(car) + '_DAY_statement_' + file.replace('.', '_') + '.html'
+    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_DAY_statement_' + file.replace('.', '_') + '.pdf'
     carthistemplatefile = open(carthistemplatefilename, 'w')
     carthistemplatefile.write(carthistemplate)
     carthistemplatefile.close()
     
     pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config)
-    print("Written car statement " + str(progress) + " of " + str(totalstatements))
+    print("Written car statement day " + str(progress) + " of " + str(totalstatements))
+    progress += 1
+for car, shifts in carrows.items():
+    leasetotal = 0
+    shiftoutput = '<tr><td>' + str('CAR').ljust(10).replace(' ', '&nbsp;') + str('DRIVER').ljust(30).replace(' ', '&nbsp;') + str('DATE').ljust(15).replace(' ', '&nbsp;') + str('SHIFT').ljust(12).replace(' ', '&nbsp;') + '</td><td></td></tr>'
+    for shift in shifts:
+        if shift['shift'] == 'NIGHT':
+            leasetotal += int(shift['value'])
+            shiftoutput += '<tr><td>' + shift['car'].ljust(10).replace(' ', '&nbsp;') + shift['driver'].ljust(8).replace(' ', '&nbsp;') + shift['name'].ljust(22).replace(' ', '&nbsp;') + shift['date'].ljust(15).replace(' ', '&nbsp;') + shift['shift'].ljust(10).replace(' ', '&nbsp;') +'</td><td class="rightalign">$' + shift['value'] + '.00</td></tr>'
+    carthistemplate = cartemplatestring
+    carthistemplate = carthistemplate.replace('$DATERANGE', daterange)
+    carthistemplate = carthistemplate.replace('$STATEMENT_NOTE', str(statementnote))
+    carthistemplate = carthistemplate.replace('$CAR_NAME', car)
+    carthistemplate = carthistemplate.replace('$SHIFT_DATA', shiftoutput)
+    carthistemplate = carthistemplate.replace('$LEASE_TOTAL', str(Decimal(leasetotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
+    carthistemplatefilename = 'statements/car/' + str(car) + '_NIGHT_statement_' + file.replace('.', '_') + '.html'
+    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_NIGHT_statement_' + file.replace('.', '_') + '.pdf'
+    carthistemplatefile = open(carthistemplatefilename, 'w')
+    carthistemplatefile.write(carthistemplate)
+    carthistemplatefile.close()
+    
+    pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config)
+    print("Written car statement night " + str(progress) + " of " + str(totalstatements))
     progress += 1
 
 print("all done!")
