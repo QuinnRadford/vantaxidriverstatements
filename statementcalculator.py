@@ -17,16 +17,20 @@ def formatCharges(chargeval):
     else:
         return '$' + str(Decimal(chargeval).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;'
 
+#PDFkit global Constants
 path_wkthmltopdf = r'wkhtmltopdf\bin\wkhtmltopdf.exe'
 config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
 options = {
     'quiet': ''
     }
+#SQL Connection
 diskconn = sqlite3.connect('config/statements.db')
 memconn = sqlite3.connect(':memory:')
 query = "".join(line for line in diskconn.iterdump())
 memconn.executescript(query)
 c = memconn.cursor()
+
+#User inputs
 file=""
 while file == "":
     print('Enter Report File Name (including file type "example.csv"): ')
@@ -44,11 +48,96 @@ statementnote = input()
 if statementnote == "":
     statementnote = "None"
     print("Note Skipped.")
-
+weekenddate = "" #Long Weekend
+while weekenddate == "":
+    print('Does this month contain a long weekend? enter y/n')
+    weekenddate = input()
+    if weekenddate == "n":
+        print("No long weekend")
+    if weekenddate == "y":
+        print("Enter the date of the Sunday on the long weekend dd/mm/yy")
+        weekenddate = input()
+        weekenddatetime = datetime.strptime(weekenddate, '%d/%m/%y')
+    else:
+        print("invalid response")
+        weekenddatetime = "none"
 idpattern = re.compile(r'(\d\d*)')
 
-optiontree = ET.parse('config/options.xml')
-optionroot = optiontree.getroot()
+
+
+def saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftoutput, leasetotal, car):
+    carthistemplate = cartemplatestring #instantiate car template
+    carthistemplate = carthistemplate.replace('$DATERANGE', daterange)
+    carthistemplate = carthistemplate.replace('$STATEMENT_NOTE', str(statementnote))
+    carthistemplate = carthistemplate.replace('$CAR_NAME', car + dayNight[0])
+    carthistemplate = carthistemplate.replace('$SHIFT_DATA', shiftoutput)
+    carthistemplate = carthistemplate.replace('$LEASE_TOTAL', str(Decimal(leasetotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
+    carthistemplatefilename = 'statements/car/thiscar.html' #temporary html file for further processing into pdf
+    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_NIGHT_statement_' + file.replace('.', '_') + '.pdf'
+    carthistemplatefile = open(carthistemplatefilename, 'w')
+    carthistemplatefile.write(carthistemplate)
+    carthistemplatefile.close()
+    #pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config) #save temp HTML file as properly named PDF
+
+def genStatement(carrows, dayNight, carTemplatePath):
+    
+    # dayNight str values = NIGHT, DAY
+    WEEKDAY_NAMES = [
+    "monday",
+    "tuesday",
+    "wednesday",
+    "thursday",
+    "friday",
+    "saturday",
+    "sunday"
+    ]
+
+    STATEMENT_HEADER = {
+    "DRIVER" : 36,
+    "DATE" : 15,
+    "SHIFT" : 12
+    } #data : length
+
+    #Table structure templates
+    HEADER_STRUCT = '<tr><td>$CONTENT</td><td></td></tr>'
+    TABLE_STRUCT = '<tr><td>$CONTENT</td><td>$VALUE</td></tr>'
+
+    progress = 0 #Progress counter
+    totalstatements = len(carrows) #total of
+
+    cartemplatefile = open(carTemplatePath, 'r')
+    cartemplatestring = cartemplatefile.read() #read the car template
+
+    headerItems = ""
+    for head, length in STATEMENT_HEADER.items():#build the header line content
+        headerItems += head.ljust(length).replace(' ', '&nbsp;')
+    
+    headerLine = HEADER_STRUCT.replace('$CONTENT', headerItems)
+
+    for car, shifts in carrows.items():
+        leasetotal = 0 #initialize total lease
+        shiftoutput = headerLine #initialize output with table header line
+        for shift in shifts:
+            if shift['shift'] == dayNight or shift['shift'] == 'TCAR':
+                leasetotal += int(shift['value'])
+                weekdayId = datetime.strptime(shift['date'], '%Y/%m/%d').weekday()
+                thisWeekdayName = WEEKDAY_NAMES[weekdayId]
+                shiftCols = {
+                    shift['driver'] : 8,
+                    shift['name'] : 28,
+                    shift['date'] : 15,
+                    thisWeekdayName : 12
+                }
+                colItems = ""
+                for col, length in shiftCols.items(): #concat data columns
+                    colItems += col.ljust(length).replace(' ', '&nbsp;')
+                thisShiftRow = TABLE_STRUCT.replace('$CONTENT',colItems)
+                thisShiftRow = TABLE_STRUCT.replace('$VALUE',shift['value'] + '.00')
+                shiftoutput += thisShiftRow #append row to output table
+
+        saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftoutput, leasetotal, car)
+        print("Written car statement " + dayNight + " " + str(progress) + " of " + str(totalstatements))
+        progress += 1
 
 #weekday names
 allweekdays = {
@@ -60,6 +149,9 @@ allweekdays = {
     "5":"saturday",
     "6":"sunday"
     }
+
+optiontree = ET.parse('config/options.xml')
+optionroot = optiontree.getroot() #open options xml file for lease rates
 
 #get sedan lease rates
 sedanrates=optionroot.find("leases").find("sedan")
@@ -85,11 +177,11 @@ nightvanleases = {
     "5":vanrates.find("saturday").text,
     "6":vanrates.find("sunday").text
     }
+
 #get tcar lease rates
 tcarlease = optionroot.find("leases").find("tcar").text
 
 #get car owners
-ownerlist = {}
 c.execute('CREATE TABLE Exemptions (driverID, car, shift);')
 with open('config/owner_id.csv') as ownerids:
     #read line by line
@@ -110,23 +202,24 @@ with open(file) as shiftrows:
         houron = 0
         houroff = 0
         thisshiftrow = line.split(r'","')
+
         car = thisshiftrow[6]
         timeonstring = thisshiftrow[8]
         driverstring = thisshiftrow[7]
         timeoffstring = thisshiftrow[9]
         drivername = re.sub(r'(\d\d* \- )', ' ', driverstring)
-        if(timeonstring != '-'):
+        if(timeonstring != '-') and (timeonstring != '0'):
             datetimeon = datetime.strptime(timeonstring, '%d %b %Y, %H:%M')
-            if(timeoffstring == '-'):
+            if(timeoffstring == '-') or (timeoffstring == '0'):
                 datetimeoff = datetimeon + timedelta(hours=6)
-                #print('logoff out of range, set to ' + str(datetimeoff) + ' for ' + drivername)
             else:
                 datetimeoff = datetime.strptime(timeoffstring, '%d %b %Y, %H:%M')
             driverid = idpattern.match(driverstring).group(0)
             houron = datetimeon.hour
             houroff = datetimeoff.hour
             shiftlength = datetimeoff - datetimeon
-
+            
+            #Determine whether the shift is day or night
             if houron > houroff and shiftlength.seconds < 46800:
                 shifttype = 1 #night
             elif houron <= 3 and houroff <= 5 and shiftlength.seconds > 7200:
@@ -146,8 +239,6 @@ with open(file) as shiftrows:
                 shifttype = 3 #toss
             elif houron <= 6 and houroff >= 6 and shiftlength.seconds > 7200:
                 shifttype = 0 #day
-            #elif houron >= 6 and shiftlength.seconds < 43200 and shiftlength.seconds > 7200:
-                #shifttype = 0 #day
             elif houron >= 3 and houron <= 14 and houroff <= 17 and shiftlength.seconds > 7200:
                 shifttype = 0 #day
             elif shiftlength.seconds > 7200:
@@ -222,7 +313,7 @@ cartypes = {
     "18":0,
     "20":0,
     "22":0,
-    "23":0,
+    "23":1,
     "25":0,
     "26":0,
     "29":0,
@@ -449,7 +540,10 @@ for driver in driverrows:
                         shiftvalue = sedanddaylease
                     elif carList[carname]['type'] == 1:
                         shiftType = 'NIGHT'
-                        shiftvalue = nightsedanleases[weekday]
+                        if weekenddatetime != "none" and datetime.fromtimestamp(startdates[0]).date() == weekenddatetime.date():
+                            shiftvalue = 120
+                        else:
+                            shiftvalue = nightsedanleases[weekday]
                     else:
                         print("shift type error!")
                 elif cartypes[thiscar] == 1:
@@ -460,7 +554,10 @@ for driver in driverrows:
                         shiftvalue = vanldayease
                     elif carList[carname]['type'] == 1:
                         shiftType = 'NIGHT'
-                        shiftvalue = nightvanleases[weekday]
+                        if weekenddatetime != "none" and datetime.fromtimestamp(startdates[0]).date() == weekenddatetime.date():
+                            shiftvalue = 120
+                        else:
+                            shiftvalue = nightvanleases[weekday]
                     else:
                         print("shift type error!")
                 elif cartypes[thiscar] == 2:
@@ -504,13 +601,13 @@ for driver in driverrows:
         thistemplate = thistemplate.replace('$ACCOUNT_NOTES','Your minimum account balance (deposit) has been increased by $' + str(Decimal(balanceout - balancein).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;')
     else:
         thistemplate = thistemplate.replace('$ACCOUNT_NOTES',' ')
-    thistemplatefilename = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.html'
+    thistemplatefilename = 'statements/operator/thisdriver.html'
     thistemplatefilenamepdf = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.pdf'
     thistemplatefile = open(thistemplatefilename, 'w')
     thistemplatefile.write(thistemplate)
     thistemplatefile.close()
     #write pdf version of operator statement
-    pdfkit.from_file(thistemplatefilename, thistemplatefilenamepdf,options = options, configuration = config)
+    #pdfkit.from_file(thistemplatefilename, thistemplatefilenamepdf,options = options, configuration = config)
     print('Writing Operator Statement ' + str(driverPdfIndex) + ' of ' + str(totalDriverPdf))
     driverPdfIndex += 1
     
@@ -523,52 +620,8 @@ c.close()
 memconn.close()
 print("Writing Car statements, this may take some time..")
 #write day car shifts
-progress = 1
-totalstatements = len(carrows.items())
-for car, shifts in carrows.items():
-    leasetotal = 0
-    shiftoutput = '<tr><td>' + str('CAR').ljust(10).replace(' ', '&nbsp;') + str('DRIVER').ljust(30).replace(' ', '&nbsp;') + str('DATE').ljust(15).replace(' ', '&nbsp;') + str('SHIFT').ljust(12).replace(' ', '&nbsp;') + '</td><td></td></tr>'
-    for shift in shifts:
-        if shift['shift'] == 'DAY':
-            leasetotal += int(shift['value'])
-            shiftoutput += '<tr><td>' + shift['car'].ljust(10).replace(' ', '&nbsp;') + shift['driver'].ljust(8).replace(' ', '&nbsp;') + shift['name'].ljust(22).replace(' ', '&nbsp;') + shift['date'].ljust(15).replace(' ', '&nbsp;') + shift['shift'].ljust(10).replace(' ', '&nbsp;') +'</td><td class="rightalign">$' + shift['value'] + '.00</td></tr>'
-    carthistemplate = cartemplatestring
-    carthistemplate = carthistemplate.replace('$DATERANGE', daterange)
-    carthistemplate = carthistemplate.replace('$STATEMENT_NOTE', str(statementnote))
-    carthistemplate = carthistemplate.replace('$CAR_NAME', car)
-    carthistemplate = carthistemplate.replace('$SHIFT_DATA', shiftoutput)
-    carthistemplate = carthistemplate.replace('$LEASE_TOTAL', str(Decimal(leasetotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
-    carthistemplatefilename = 'statements/car/' + str(car) + '_DAY_statement_' + file.replace('.', '_') + '.html'
-    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_DAY_statement_' + file.replace('.', '_') + '.pdf'
-    carthistemplatefile = open(carthistemplatefilename, 'w')
-    carthistemplatefile.write(carthistemplate)
-    carthistemplatefile.close()
-    
-    pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config)
-    print("Written car statement day " + str(progress) + " of " + str(totalstatements))
-    progress += 1
-for car, shifts in carrows.items():
-    leasetotal = 0
-    shiftoutput = '<tr><td>' + str('CAR').ljust(10).replace(' ', '&nbsp;') + str('DRIVER').ljust(30).replace(' ', '&nbsp;') + str('DATE').ljust(15).replace(' ', '&nbsp;') + str('SHIFT').ljust(12).replace(' ', '&nbsp;') + '</td><td></td></tr>'
-    for shift in shifts:
-        if shift['shift'] == 'NIGHT':
-            leasetotal += int(shift['value'])
-            shiftoutput += '<tr><td>' + shift['car'].ljust(10).replace(' ', '&nbsp;') + shift['driver'].ljust(8).replace(' ', '&nbsp;') + shift['name'].ljust(22).replace(' ', '&nbsp;') + shift['date'].ljust(15).replace(' ', '&nbsp;') + shift['shift'].ljust(10).replace(' ', '&nbsp;') +'</td><td class="rightalign">$' + shift['value'] + '.00</td></tr>'
-    carthistemplate = cartemplatestring
-    carthistemplate = carthistemplate.replace('$DATERANGE', daterange)
-    carthistemplate = carthistemplate.replace('$STATEMENT_NOTE', str(statementnote))
-    carthistemplate = carthistemplate.replace('$CAR_NAME', car)
-    carthistemplate = carthistemplate.replace('$SHIFT_DATA', shiftoutput)
-    carthistemplate = carthistemplate.replace('$LEASE_TOTAL', str(Decimal(leasetotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
-    carthistemplatefilename = 'statements/car/' + str(car) + '_NIGHT_statement_' + file.replace('.', '_') + '.html'
-    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_NIGHT_statement_' + file.replace('.', '_') + '.pdf'
-    carthistemplatefile = open(carthistemplatefilename, 'w')
-    carthistemplatefile.write(carthistemplate)
-    carthistemplatefile.close()
-    
-    pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config)
-    print("Written car statement night " + str(progress) + " of " + str(totalstatements))
-    progress += 1
+genStatement(carrows, "DAY", 'templates/car-template.html')
+genStatement(carrows, "NIGHT", 'templates/car-template.html')
 
 print("all done!")
 print('Press enter to close this window')

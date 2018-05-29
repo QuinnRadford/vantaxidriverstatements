@@ -109,20 +109,20 @@ car,id,name note,shift
 231,498595,B RANA,0
 227,966667,no,0
 700,498595,B RANA,0
-701,128676,offline,0
-702,794857,offline,0
-703,691631,offline,0
-704,1995,offline,0
-705,3614,offline,0
-706,213739,offline,0
-707,8318,offline,0
-708,121304,offline,0
-709,7579,offline,0
-710,831278,offline,0
-711,750008,offline,0
-712,72321,offline,0
-713,8907,offline,0
-715,8999,offline,0
+701,128676,n grewal,0
+702,794857,abdulahi,0
+703,691631,masoud,0
+704,1995,gurbux,0
+705,3614,Hardeep Dhami,0
+706,213739,Gama Anson,0
+707,8318,Sandhu Baljinder ,0
+708,121304,Bhangu Malkit ,0
+709,7579,SAVINDER  singh,0
+710,831278,Iqbal Randhawa,0
+711,750008,Virk Jagdev (son's #),0
+712,72321,Ajmer Gill,0
+713,8907,Gurpreet Toor,0
+715,8999,Amrik Sandhu,0
 1,764256,A FRANK,1
 2,20451,V BALAGAN,1
 3,341782,R BAINS,1
@@ -249,3 +249,99 @@ car,id,name note,shift
 222,596309,S Rana,0
 222,596309,S Rana,1
 222,2757,R SANDHU,1
+40,691631,Masoud,1
+40,691631,Masoud,0
+111,627,balwant Dhillon,1
+46,4146,Ratko Andjik,1
+46,4146,Ratko Andjik,0
+215,1393,Mohamed ait alla,0
+44,1333,morteza abdolahi,1
+44,1333,morteza abdolahi,0
+53,1333,morteza abdolahi,1
+53,1333,morteza abdolahi,0
+54,1333,morteza abdolahi,1
+54,1333,morteza abdolahi,0
+98,1333,morteza abdolahi,1
+98,1333,morteza abdolahi,0
+208,1333,morteza abdolahi,1
+208,1333,morteza abdolahi,0
+210,1333,morteza abdolahi,1
+210,1333,morteza abdolahi,0
+204,1333,morteza abdolahi,1
+204,1333,morteza abdolahi,0
+44,714243,mohamed abdolahi,1
+44,714243,mohamed abdolahi,0
+53,714243,mohamed abdolahi,1
+53,714243,mohamed abdolahi,0
+54,714243,mohamed abdolahi,1
+54,714243,mohamed abdolahi,0
+98,714243,mohamed abdolahi,1
+98,714243,mohamed abdolahi,0
+208,714243,mohamed abdolahi,1
+208,714243,mohamed abdolahi,0
+210,714243,mohamed abdolahi,1
+210,714243,mohamed abdolahi,0
+204,714243,mohamed abdolahi,1
+204,714243,mohamed abdolahi,0
+44,794857,ABDOLLAHI,1
+44,794857,ABDOLLAHI,0
+53,794857,ABDOLLAHI,1
+53,794857,ABDOLLAHI,0
+54,794857,ABDOLLAHI,1
+54,794857,ABDOLLAHI,0
+98,794857,ABDOLLAHI,1
+98,794857,ABDOLLAHI,0
+208,794857,ABDOLLAHI,1
+208,794857,ABDOLLAHI,0
+210,794857,ABDOLLAHI,1
+210,794857,ABDOLLAHI,0
+204,794857,ABDOLLAHI,1
+204,794857,ABDOLLAHI,0
+44,628234,rohani eghan,1
+44,628234,rohani eghan,0
+53,628234,rohani eghan,1
+53,628234,rohani eghan,0
+54,628234,rohani eghan,1
+54,628234,rohani eghan,0
+98,628234,rohani eghan,1
+98,628234,rohani eghan,0
+208,628234,rohani eghan,1
+208,628234,rohani eghan,0
+210,628234,rohani eghan,1
+210,628234,rohani eghan,0
+204,628234,rohani eghan,1
+204,628234,rohani eghan,0
+44,679631,rohani arman,1
+44,679631,rohani arman,0
+53,679631,rohani arman,1
+53,679631,rohani arman,0
+54,679631,rohani arman,1
+54,679631,rohani arman,0
+98,679631,rohani arman,1
+98,679631,rohani arman,0
+208,679631,rohani arman,1
+208,679631,rohani arman,0
+210,679631,rohani arman,1
+210,679631,rohani arman,0
+204,679631,rohani arman,1
+204,679631,rohani arman,0
+44,584321,jaber,1
+44,584321,jaber,0
+53,584321,jaber,1
+53,584321,jaber,0
+54,584321,jaber,1
+54,584321,jaber,0
+98,584321,jaber,1
+98,584321,jaber,0
+208,584321,jaber,1
+208,584321,jaber,0
+210,584321,jaber,1
+210,584321,jaber,0
+204,584321,jaber,1
+204,584321,jaber,0
+703,249667,reza,1
+703,599614,IVO K,1
+703,249667,reza,0
+703,599614,IVO K,0
+36,7208,Jeewan nahal,1
+36,7208,Jeewan nahal,0
