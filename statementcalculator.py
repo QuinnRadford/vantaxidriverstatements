@@ -17,53 +17,117 @@ def formatCharges(chargeval):
     else:
         return '$' + str(Decimal(chargeval).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)) + '&nbsp;'
 
-#PDFkit global Constants
-path_wkthmltopdf = r'wkhtmltopdf\bin\wkhtmltopdf.exe'
-config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
-options = {
-    'quiet': ''
+class UserInputs:
+    def __init__(self):
+        self.logonPath = ""
+        self.chargePath = ""
+        self.statementNote = ""
+        self.longWeekendDate = ""
+        self.longWeekendDateTime = datetime.now()
+    def userInput(self, message):
+        thisInput = ""
+        while thisInput == "":
+            print(message)
+            thisInput = input()
+            if thisInput == "":
+                print("Invalid Response")
+        return thisInput
+    def userSetlogonPath(self, skip=False):
+        if not skip:
+            self.logonPath = self.userInput('Enter Report File Name (including file type "example.csv"): ')
+        else:
+            print("skipping input")
+            self.logonPath = skip
+    def userSetChargePath(self, skip=False):
+        if not skip:
+            self.chargePath = self.userInput('Enter Charges File Name (including file type "example.csv"): ')
+        else:
+            print("skipping input")
+            self.chargePath = skip
+    def userSetStatementNote(self, skip=False):
+        if not skip:
+            self.statementNote = self.userInput('Enter Statement Note/Reason: ')
+        else:
+            print("skipping input")
+            self.statementNote = skip
+    def userSetLongWeekendDate(self):
+        while self.longWeekendDate == "":
+            print('Does this month contain a long weekend? enter y/n')
+            self.longWeekendDate = input()
+            if self.longWeekendDate == "n":
+                print("No long weekend")
+            if self.longWeekendDate == "y":
+                print("Enter the date of the Sunday on the long weekend dd/mm/yy")
+                self.longWeekendDate = input()
+                self.longWeekendDateTime = datetime.strptime(self.longWeekendDate, '%d/%m/%y')
+            else:
+                print("invalid response")
+                self.longWeekendDateTime = "none"
+
+class ShiftCSV:
+    WEEKDAY_NAMES = [
+    "Monday",
+    "Tuesday",
+    "Wednesday",
+    "Thursday",
+    "Friday",
+    "Saturday",
+    "Sunday"
+    ]
+    shiftMap = {
+        0:"Day",
+        1:"Night",
+        2:"Tcar"
     }
-#SQL Connection
-diskconn = sqlite3.connect('config/statements.db')
-memconn = sqlite3.connect(':memory:')
-query = "".join(line for line in diskconn.iterdump())
-memconn.executescript(query)
-c = memconn.cursor()
-
-#User inputs
-file=""
-while file == "":
-    print('Enter Report File Name (including file type "example.csv"): ')
-    file = input()
-    if file == "":
-        print("No file selected")
-chargesfile=""
-while chargesfile == "":
-    print('Enter Charges File Name (including file type "example.csv"): ')
-    chargesfile = input()
-    if chargesfile == "":
-        print("No file selected")
-print('Enter Statement Note/Reason or ENTER to skip: ')
-statementnote = input()
-if statementnote == "":
-    statementnote = "None"
-    print("Note Skipped.")
-weekenddate = "" #Long Weekend
-while weekenddate == "":
-    print('Does this month contain a long weekend? enter y/n')
-    weekenddate = input()
-    if weekenddate == "n":
-        print("No long weekend")
-    if weekenddate == "y":
-        print("Enter the date of the Sunday on the long weekend dd/mm/yy")
-        weekenddate = input()
-        weekenddatetime = datetime.strptime(weekenddate, '%d/%m/%y')
-    else:
-        print("invalid response")
-        weekenddatetime = "none"
-idpattern = re.compile(r'(\d\d*)')
-
-
+    csvHeader = "account,amount,comment\n"
+    def __init__(self):
+        self.csvValue = ""
+    def appCSV(self, lineAppend):
+        self.csvValue = self.csvValue + lineAppend
+    def formatDate(self, date, mode):
+        if mode == 1:
+            return str(str(date)[0] + str(date)[1] + str(date)[2] +str(date)[3] + '/' + str(date)[4] +str(date)[5] + '/' + str(date)[6] +str(date)[7])
+        else:
+            return str(str(date)[4] +str(date)[5] + '-' + str(date)[6] +str(date)[7] + '-' + str(date)[2] +str(date)[3])
+    def formatDriverAccount(self, driverId):
+        idString = str(driverId)
+        if len(idString) > 6:
+            idString = "23" + idString[-6:]
+        else:
+            idString = "23" + idString.ljust(6,"0")
+        return idString
+    def formatCarAccount(self, car, shift):
+        shiftString = str(int(shift + 1)) #shift up shift type by 1
+        carString = str(car)
+        carString = carString.rjust(3,"0") #pad car number with 0s to the right
+        carString = "22" + carString.ljust(5,"0") + shiftString
+        return carString
+    def appendShift(self, driverId, car, date, shift, value, name):
+        driverAccount = self.formatDriverAccount(driverId)
+        carAccount = self.formatCarAccount(car, shift)
+        weekdayId = datetime.strptime(date, '%Y%m%d').weekday()
+        lineCols = {
+        "driver" : [
+            driverAccount,
+            str(value)
+        ],
+        "car" : [
+            carAccount,
+            "-" + str(value)
+        ],
+        "tx" : [
+            self.formatDate(date, 2),
+            "lease",
+            str("VT" + str(car) + " " + self.shiftMap[shift] + " " + self.WEEKDAY_NAMES[weekdayId] + " - ID " + str(driverId) + " " + name)
+        ]
+        }
+        self.appCSV(str(','.join(lineCols["tx"]) + '\n'))
+        self.appCSV(str(','.join(lineCols["driver"]) + '\n'))
+        self.appCSV(str(','.join(lineCols["car"]) + '\n'))
+    def writeFile(self, csvPath):
+        thisDriverdata = open('csv/' + csvPath, 'w')
+        thisDriverdata.write(self.csvHeader + self.csvValue)
+        thisDriverdata.close()
 
 def saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftoutput, leasetotal, car):
     carthistemplate = cartemplatestring #instantiate car template
@@ -73,15 +137,16 @@ def saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftou
     carthistemplate = carthistemplate.replace('$SHIFT_DATA', shiftoutput)
     carthistemplate = carthistemplate.replace('$LEASE_TOTAL', str(Decimal(leasetotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
     carthistemplatefilename = 'statements/car/thiscar.html' #temporary html file for further processing into pdf
-    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_NIGHT_statement_' + file.replace('.', '_') + '.pdf'
+    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_NIGHT_statement_' + userInput.logonPath.replace('.', '_') + '.pdf'
     carthistemplatefile = open(carthistemplatefilename, 'w')
     carthistemplatefile.write(carthistemplate)
     carthistemplatefile.close()
-    #pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config) #save temp HTML file as properly named PDF
+    pdfkit.from_file(carthistemplatefilename, carthistemplatefilenamepdf,options = options, configuration = config) #save temp HTML file as properly named PDF
 
 def genStatement(carrows, dayNight, carTemplatePath):
-    
-    # dayNight str values = NIGHT, DAY
+    #carTemplatePath string path to template
+    #carrows array [car, shift[]]
+    #dayNight str values: NIGHT, DAY
     WEEKDAY_NAMES = [
     "monday",
     "tuesday",
@@ -100,7 +165,7 @@ def genStatement(carrows, dayNight, carTemplatePath):
 
     #Table structure templates
     HEADER_STRUCT = '<tr><td>$CONTENT</td><td></td></tr>'
-    TABLE_STRUCT = '<tr><td>$CONTENT</td><td>$VALUE</td></tr>'
+    TABLE_STRUCT = '<tr><td>$CONTENT</td><td style="text-align:right;">$VALUE</td></tr>'
 
     progress = 0 #Progress counter
     totalstatements = len(carrows) #total of
@@ -131,14 +196,77 @@ def genStatement(carrows, dayNight, carTemplatePath):
                 colItems = ""
                 for col, length in shiftCols.items(): #concat data columns
                     colItems += col.ljust(length).replace(' ', '&nbsp;')
-                thisShiftRow = TABLE_STRUCT.replace('$CONTENT',colItems)
-                thisShiftRow = TABLE_STRUCT.replace('$VALUE',shift['value'] + '.00')
+                thisShiftRow = TABLE_STRUCT
+                thisShiftRow = thisShiftRow.replace('$CONTENT',colItems)
+                thisShiftRow = thisShiftRow.replace('$VALUE',shift['value'] + '.00')
                 shiftoutput += thisShiftRow #append row to output table
 
-        saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftoutput, leasetotal, car)
+        saveStatement(cartemplatestring, daterange, userInput.statementNote, dayNight, shiftoutput, leasetotal, car)
         print("Written car statement " + dayNight + " " + str(progress) + " of " + str(totalstatements))
         progress += 1
 
+class leaseOptions:
+    def __init__(self, optionPath):
+        self.optiontree = ET.parse(optionPath)
+        self.optionroot = self.optiontree.getroot() #open options xml file for lease rates
+        self.sedanrates=self.optionroot.find("leases").find("sedan")
+        self.vanrates=self.optionroot.find("leases").find("van")
+        self.sedanLeases = {
+            "0":self.sedanrates.find("monday").text,
+            "1":self.sedanrates.find("tuesday").text,
+            "2":self.sedanrates.find("wednesday").text,
+            "3":self.sedanrates.find("thursday").text,
+            "4":self.sedanrates.find("friday").text,
+            "5":self.sedanrates.find("saturday").text,
+            "6":self.sedanrates.find("sunday").text,
+            "day":self.sedanrates.find("day").text
+        }
+        self.vanLeases = {
+            "0":self.vanrates.find("monday").text,
+            "1":self.vanrates.find("tuesday").text,
+            "2":self.vanrates.find("wednesday").text,
+            "3":self.vanrates.find("thursday").text,
+            "4":self.vanrates.find("friday").text,
+            "5":self.vanrates.find("saturday").text,
+            "6":self.vanrates.find("sunday").text,
+            "day":self.vanrates.find("day").text
+        }
+        #get tcar lease rates
+        self.tcarlease = self.optionroot.find("leases").find("tcar").text
+    def getSedanRate(self, day):
+        return self.sedanLeases[day]
+    def getVanRate(self, day):
+        return self.vanLeases[day]
+    def getTcarRate(self):
+        return self.tcarlease
+
+def setExemptDrivers(con, ownerConfigPath):
+    #get car owners
+    con.execute('CREATE TABLE Exemptions (driverID, car, shift);')
+    with open(ownerConfigPath) as ownerids:
+        #read line by line
+        for cnt, line in enumerate(ownerids):
+            owneridvals = line.split(",")
+            if cnt == 0:
+                print('Reading Owner IDs')
+            else:
+                con.execute('INSERT INTO Exemptions (driverID, car, shift) VALUES (' + owneridvals[1] + ', ' + owneridvals[0] + ', ' + owneridvals[3] + ')')
+
+#Setup initial data
+idpattern = re.compile(r'(\d\d*)') #compile regex for parsing driver ID
+
+#PDFkit global Constants
+path_wkthmltopdf = r'wkhtmltopdf\bin\wkhtmltopdf.exe'
+config = pdfkit.configuration(wkhtmltopdf=path_wkthmltopdf)
+options = {
+    'quiet': ''
+    }
+#SQL Connection
+diskconn = sqlite3.connect('config/statements.db')
+memconn = sqlite3.connect(':memory:')
+query = "".join(line for line in diskconn.iterdump())
+memconn.executescript(query)
+c = memconn.cursor()
 #weekday names
 allweekdays = {
     "0":"monday",
@@ -148,61 +276,27 @@ allweekdays = {
     "4":"friday",
     "5":"saturday",
     "6":"sunday"
-    }
-
-optiontree = ET.parse('config/options.xml')
-optionroot = optiontree.getroot() #open options xml file for lease rates
-
-#get sedan lease rates
-sedanrates=optionroot.find("leases").find("sedan")
-sedanddaylease = sedanrates.find("day").text
-nightsedanleases = {
-    "0":sedanrates.find("monday").text,
-    "1":sedanrates.find("tuesday").text,
-    "2":sedanrates.find("wednesday").text,
-    "3":sedanrates.find("thursday").text,
-    "4":sedanrates.find("friday").text,
-    "5":sedanrates.find("saturday").text,
-    "6":sedanrates.find("sunday").text
-    }
-#get van lease rates
-vanrates=optionroot.find("leases").find("van")
-vanldayease = vanrates.find("day").text
-nightvanleases = {
-    "0":vanrates.find("monday").text,
-    "1":vanrates.find("tuesday").text,
-    "2":vanrates.find("wednesday").text,
-    "3":vanrates.find("thursday").text,
-    "4":vanrates.find("friday").text,
-    "5":vanrates.find("saturday").text,
-    "6":vanrates.find("sunday").text
-    }
-
-#get tcar lease rates
-tcarlease = optionroot.find("leases").find("tcar").text
-
-#get car owners
-c.execute('CREATE TABLE Exemptions (driverID, car, shift);')
-with open('config/owner_id.csv') as ownerids:
-    #read line by line
-    for cnt, line in enumerate(ownerids):
-        owneridvals = line.split(",")
-        if cnt == 0:
-            print('Reading Owner IDs')
-        else:
-            c.execute('INSERT INTO Exemptions (driverID, car, shift) VALUES (' + owneridvals[1] + ', ' + owneridvals[0] + ', ' + owneridvals[3] + ')')
+    }                
+setExemptDrivers(c,'config/owner_id.csv')
+leaseValues = leaseOptions('config/options.xml')
+userInput = UserInputs()
+userInput.userSetlogonPath("48-charge.csv")
+userInput.userSetChargePath("charges.csv")
+userInput.userSetStatementNote("none")
+userInput.userSetLongWeekendDate()
+shiftReport = ShiftCSV()
 
 #Service Hours Log
 serviceHours = 'Logon,Logoff,Driver,ID,Length in hours\r'
+#End setup phase
 
 #insert csv into db
-with open(file) as shiftrows:
+with open(userInput.logonPath) as shiftrows:
     for cnt, line in enumerate(shiftrows):
         shifttype = 2
         houron = 0
         houroff = 0
         thisshiftrow = line.split(r'","')
-
         car = thisshiftrow[6]
         timeonstring = thisshiftrow[8]
         driverstring = thisshiftrow[7]
@@ -218,7 +312,7 @@ with open(file) as shiftrows:
             houron = datetimeon.hour
             houroff = datetimeoff.hour
             shiftlength = datetimeoff - datetimeon
-            
+
             #Determine whether the shift is day or night
             if houron > houroff and shiftlength.seconds < 46800:
                 shifttype = 1 #night
@@ -249,7 +343,7 @@ with open(file) as shiftrows:
             c.execute('INSERT INTO Shifts (DriverID, Car, Start, End, Type, Date, Length, DriverName) VALUES ("' + driverid + '", "' + car + '", ' + str(int(datetimeon.timestamp())) + ', ' +str(int(datetimeoff.timestamp())) + ', ' + str(shifttype) + ', ' + str(datetimeon.year) + str(datetimeon.month).zfill(2) + str(datetimeon.day).zfill(2) + ', ' + str(shiftlength.seconds) + ', "' + str(drivername) + '");')
 print("Shifts CSV Okay!")
 #Write Log file
-servicelogname = 'serviceLog' + file.replace('.', '_').replace('/', '_') + '.csv'
+servicelogname = 'serviceLog' + userInput.logonPath.replace('.', '_').replace('/', '_') + '.csv'
 servicelog = open(servicelogname, 'w')
 servicelog.write(serviceHours)
 servicelog.close()
@@ -263,7 +357,7 @@ print(daterange)
 
 #instert charges into db
 chargenumber = 0
-with open(chargesfile) as charges:
+with open(userInput.chargePath) as charges:
     #read line by line
     for cnt, line in enumerate(charges):
         chargevalues = line.split(",")
@@ -286,12 +380,7 @@ else:
 
 print("Writing Driver File")
 
-driverfile = 'driver_' + file.replace('.', '_').replace('/', '_') + '.csv'
-driverdata = open('csv/' + driverfile, 'w')
-
-csvheader = 'DriverID, Car, Type, Date, Length, Value, DriverName \n'
-
-#lease values
+#car types 0 is sedan 1 is van
 
 cartypes = {
     "1":0,
@@ -487,6 +576,7 @@ for driver in driverrows:
     
 
     
+
     for date in daterows:
         c.execute('select Car, Start, End, Type, Length, DriverName from Shifts where Date = ' + str(date) + ' and DriverID = ' + str(driver) +';')
         shifttime = 0
@@ -495,7 +585,6 @@ for driver in driverrows:
         types = []
         shiftvalue = 0
         driversname = []
-        output = ""
         shiftType = ""
         cartypestring = ""
         carList = {}
@@ -537,13 +626,13 @@ for driver in driverrows:
                     cartypestring = "C"
                     if carList[carname]['type'] == 0:
                         shiftType = 'DAY'
-                        shiftvalue = sedanddaylease
+                        shiftvalue = leaseValues.getSedanRate('day')
                     elif carList[carname]['type'] == 1:
                         shiftType = 'NIGHT'
-                        if weekenddatetime != "none" and datetime.fromtimestamp(startdates[0]).date() == weekenddatetime.date():
-                            shiftvalue = 120
+                        if userInput.longWeekendDateTime != "none" and datetime.fromtimestamp(startdates[0]).date() == userInput.longWeekendDateTime.date():
+                            shiftvalue = 120 #check if longweekend
                         else:
-                            shiftvalue = nightsedanleases[weekday]
+                            shiftvalue = leaseValues.getSedanRate(weekday)
                     else:
                         print("shift type error!")
                 elif cartypes[thiscar] == 1:
@@ -551,20 +640,20 @@ for driver in driverrows:
                     cartypestring = "V"
                     if carList[carname]['type'] == 0:
                         shiftType = 'DAY'
-                        shiftvalue = vanldayease
+                        shiftvalue = leaseValues.getVanRate('day')
                     elif carList[carname]['type'] == 1:
                         shiftType = 'NIGHT'
-                        if weekenddatetime != "none" and datetime.fromtimestamp(startdates[0]).date() == weekenddatetime.date():
-                            shiftvalue = 120
+                        if userInput.longWeekendDateTime != "none" and datetime.fromtimestamp(startdates[0]).date() == userInput.longWeekendDateTime.date():
+                            shiftvalue = 120 #check if longweekend
                         else:
-                            shiftvalue = nightvanleases[weekday]
+                            shiftvalue = leaseValues.getVanRate(weekday)
                     else:
                         print("shift type error!")
                 elif cartypes[thiscar] == 2:
                     #tcar
                     cartypestring = "T"
                     shiftType = 'TCAR'
-                    shiftvalue = tcarlease
+                    shiftvalue = leaseValues.getTcarRate()
                 else:
                     shiftType = 'ERROR'
                     print("car type error!")
@@ -575,19 +664,19 @@ for driver in driverrows:
                 if len(thisOnwer) != 0:
                     shiftvalue = 0
                     ownernums += 1
-                output = str(driver) + ', ' + str(thiscar) + ', ' + str(carList[carname]['type']) +', '+ str(date) +', '+ str(round(((shifttime/60)/60), 2)) + ', ' + str(shiftvalue) + ', ' + driversname[0] + '\n'
                 rowoutput = rowoutput + '<tr><td>VT' + str(thiscar).ljust(8).replace(' ', '&nbsp;') + str(cartypestring).ljust(10).replace(' ', '&nbsp;') + str(str(date)[0] + str(date)[1] + str(date)[2] +str(date)[3] + '/' + str(date)[4] +str(date)[5] + '/' + str(date)[6] +str(date)[7]).ljust(15).replace(' ', '&nbsp;') + allweekdays[weekday].ljust(12).replace(' ', '&nbsp;') + shiftType.ljust(8).replace(' ', '&nbsp;') + '</td>' + '<td class="rightalign">$' + str(shiftvalue) + '.00</td></tr>'
                 carrows[thiscar].append({"driver" : str(driver), "car" : str(thiscar), "shift" : str(shiftType), "date" : str(str(date)[0] + str(date)[1] + str(date)[2] +str(date)[3] + '/' + str(date)[4] +str(date)[5] + '/' + str(date)[6] +str(date)[7]), "value" : str(shiftvalue), "name" : driversname[0]})
                 driverID = str(driver)
                 drivername = driversname[0]
                 totalvalue = totalvalue + int(shiftvalue)
-                alldriverdata += output
+                if int(shiftvalue) > 0:
+                    shiftReport.appendShift(driver,str(thiscar),str(date),carList[carname]['type'],int(shiftvalue), drivername)#add shift to csv
                 shifnums +=1
 
     #add values to template
     thistemplate = templatestring
     thistemplate = thistemplate.replace('$DATERANGE', daterange)
-    thistemplate = thistemplate.replace('$STATEMENT_NOTE', str(statementnote))
+    thistemplate = thistemplate.replace('$STATEMENT_NOTE', str(userInput.statementNote))
     thistemplate = thistemplate.replace('$DRIVER_NAME', drivername)
     thistemplate = thistemplate.replace('$DRIVER_NUMBER', driverID)
     thistemplate = thistemplate.replace('$SHIFT_DATA', rowoutput)
@@ -602,20 +691,20 @@ for driver in driverrows:
     else:
         thistemplate = thistemplate.replace('$ACCOUNT_NOTES',' ')
     thistemplatefilename = 'statements/operator/thisdriver.html'
-    thistemplatefilenamepdf = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + file.replace('.', '_') + '.pdf'
+    thistemplatefilenamepdf = 'statements/operator/' + str(driver) + '_' + drivername.replace(' ', '_').replace('/', '_') + '_statement_' + userInput.logonPath.replace('.', '_') + '.pdf'
     thistemplatefile = open(thistemplatefilename, 'w')
     thistemplatefile.write(thistemplate)
     thistemplatefile.close()
     #write pdf version of operator statement
-    #pdfkit.from_file(thistemplatefilename, thistemplatefilenamepdf,options = options, configuration = config)
+    pdfkit.from_file(thistemplatefilename, thistemplatefilenamepdf,options = options, configuration = config)
     print('Writing Operator Statement ' + str(driverPdfIndex) + ' of ' + str(totalDriverPdf))
     driverPdfIndex += 1
     
-
-driverdata.write(csvheader + alldriverdata)
+driverfile = 'driver_' + userInput.logonPath.replace('.', '_').replace('/', '_') + '.csv'
+shiftReport.writeFile(driverfile)
 print(str(shifnums) + " shifts written")
 templatefile.close()
-driverdata.close()
+
 c.close()
 memconn.close()
 print("Writing Car statements, this may take some time..")
