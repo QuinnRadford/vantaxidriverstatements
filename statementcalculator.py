@@ -23,6 +23,7 @@ class UserInputs:
         self.chargePath = ""
         self.statementNote = ""
         self.longWeekendDate = ""
+        self.statementMonth = ""
         self.longWeekendDateTime = datetime.now()
     def userInput(self, message):
         thisInput = ""
@@ -50,6 +51,12 @@ class UserInputs:
         else:
             print("skipping input")
             self.statementNote = skip
+    def userSetStatementMonth(self, skip=False):
+        if not skip:
+            self.statementMonth = self.userInput('Enter Statement Month: ')
+        else:
+            print("skipping input")
+            self.statementMonth = skip
     def userSetLongWeekendDate(self):
         while self.longWeekendDate == "":
             print('Does this month contain a long weekend? enter y/n')
@@ -64,24 +71,36 @@ class UserInputs:
                 print("invalid response")
                 self.longWeekendDateTime = "none"
 
+def formatCarAccount(car, shift):
+        shiftString = str(int(shift + 1)) #shift up shift type by 1
+        carString = str(car)
+        if carString[0] == "7" and len(carString) > 2:
+            shiftString = "3"
+        carString = carString.rjust(3,"0") #pad car number with 0s to the right
+        carString = "22" + carString.ljust(5,"0") + shiftString
+        return carString
+
 class ShiftCSV:
     WEEKDAY_NAMES = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday"
+    "Mon",
+    "Tue",
+    "Wedy",
+    "Thu",
+    "Fri",
+    "Sat",
+    "Sun"
     ]
     shiftMap = {
-        0:"Day",
-        1:"Night",
-        2:"Tcar"
+        0:"D",
+        1:"N",
+        2:"T"
     }
     csvHeader = "account,amount,comment\n"
     def __init__(self):
         self.csvValue = ""
+        self.testCSV = ""
+    def apTestCSV(self, lineAppend):
+        self.testCSV = self.testCSV + lineAppend
     def appCSV(self, lineAppend):
         self.csvValue = self.csvValue + lineAppend
     def formatDate(self, date, mode):
@@ -99,6 +118,8 @@ class ShiftCSV:
     def formatCarAccount(self, car, shift):
         shiftString = str(int(shift + 1)) #shift up shift type by 1
         carString = str(car)
+        if carString[0] == "7" and len(carString) > 2:
+            shiftString = "3"
         carString = carString.rjust(3,"0") #pad car number with 0s to the right
         carString = "22" + carString.ljust(5,"0") + shiftString
         return carString
@@ -118,18 +139,27 @@ class ShiftCSV:
         "tx" : [
             self.formatDate(date, 2),
             "lease",
-            str("VT" + str(car) + " " + self.shiftMap[shift] + " " + self.WEEKDAY_NAMES[weekdayId] + " - ID " + str(driverId) + " " + name)
+            str("VT" + str(car) + self.shiftMap[shift] + " " + self.WEEKDAY_NAMES[weekdayId] + " - ID " + str(driverId).ljust(8) + " " + name)
         ]
         }
         self.appCSV(str(','.join(lineCols["tx"]) + '\n'))
         self.appCSV(str(','.join(lineCols["driver"]) + '\n'))
         self.appCSV(str(','.join(lineCols["car"]) + '\n'))
+
+        self.apTestCSV(str(','.join(lineCols["driver"]) + '\n'))
+        self.apTestCSV(str(','.join(lineCols["car"]) + '\n'))
+
+    def writeOneFile(self, csvPath):
+        thisDriverdata = open('csv/' + csvPath, 'w')
+        thisDriverdata.write(self.csvHeader + self.testCSV)
+        thisDriverdata.close()
+
     def writeFile(self, csvPath):
         thisDriverdata = open('csv/' + csvPath, 'w')
         thisDriverdata.write(self.csvHeader + self.csvValue)
         thisDriverdata.close()
 
-def saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftoutput, leasetotal, car):
+def saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftoutput, leasetotal, car, month):
     carthistemplate = cartemplatestring #instantiate car template
     carthistemplate = carthistemplate.replace('$DATERANGE', daterange)
     carthistemplate = carthistemplate.replace('$STATEMENT_NOTE', str(statementnote))
@@ -137,7 +167,14 @@ def saveStatement(cartemplatestring, daterange, statementnote, dayNight, shiftou
     carthistemplate = carthistemplate.replace('$SHIFT_DATA', shiftoutput)
     carthistemplate = carthistemplate.replace('$LEASE_TOTAL', str(Decimal(leasetotal).quantize(Decimal('0.01'), rounding=ROUND_HALF_DOWN)))
     carthistemplatefilename = 'statements/car/thiscar.html' #temporary html file for further processing into pdf
-    carthistemplatefilenamepdf = 'statements/car/' + str(car) + '_NIGHT_statement_' + userInput.logonPath.replace('.', '_') + '.pdf'
+    if shiftoutput == "NIGHT":
+        shiftCode = 0
+    elif shiftoutput == "DAY":
+        shiftCode = 1
+    else:
+        shiftCode = 9
+
+    carthistemplatefilenamepdf = 'statements/car/' + str(car).rjust(3,"0") + dayNight[0] + '_attendance_' + month + '.pdf'
     carthistemplatefile = open(carthistemplatefilename, 'w')
     carthistemplatefile.write(carthistemplate)
     carthistemplatefile.close()
@@ -201,7 +238,7 @@ def genStatement(carrows, dayNight, carTemplatePath):
                 thisShiftRow = thisShiftRow.replace('$VALUE',shift['value'] + '.00')
                 shiftoutput += thisShiftRow #append row to output table
 
-        saveStatement(cartemplatestring, daterange, userInput.statementNote, dayNight, shiftoutput, leasetotal, car)
+        saveStatement(cartemplatestring, daterange, userInput.statementNote, dayNight, shiftoutput, leasetotal, car, userInput.statementMonth)
         print("Written car statement " + dayNight + " " + str(progress) + " of " + str(totalstatements))
         progress += 1
 
@@ -280,10 +317,11 @@ allweekdays = {
 setExemptDrivers(c,'config/owner_id.csv')
 leaseValues = leaseOptions('config/options.xml')
 userInput = UserInputs()
-userInput.userSetlogonPath("48-charge.csv")
-userInput.userSetChargePath("charges.csv")
-userInput.userSetStatementNote("none")
+userInput.userSetlogonPath()
+userInput.userSetChargePath()
+userInput.userSetStatementNote()
 userInput.userSetLongWeekendDate()
+userInput.userSetStatementMonth()
 shiftReport = ShiftCSV()
 
 #Service Hours Log
@@ -388,7 +426,7 @@ cartypes = {
     "3":0,
     "4":0,
     "5":0,
-    "6":0,
+    "6":3,
     "7":0,
     "8":0,
     "9":0,
@@ -449,14 +487,14 @@ cartypes = {
     "81":1,
     "88":0,
     "90":0,
-    "91":0,
+    "91":3,
     "94":1,
     "98":0,
     "99":0,
     "100":0,
     "101":1,
     "102":1,
-    "104":0,
+    "104":3,
     "107":0,
     "110":0,
     "111":0,
@@ -621,10 +659,13 @@ for driver in driverrows:
                 if thiscar not in cartypes:
                     shiftType = 'ERROR'
                     print("car type error!")
-                elif cartypes[thiscar] == 0:
+                elif cartypes[thiscar] == 0 or cartypes[thiscar] == 3:
                     #car
                     cartypestring = "C"
-                    if carList[carname]['type'] == 0:
+                    if carList[carname]['type'] == 0 and cartypes[thiscar] == 3:
+                        shiftType = 'DAY'
+                        shiftvalue = 85 #85 for camry
+                    elif carList[carname]['type'] == 0:
                         shiftType = 'DAY'
                         shiftvalue = leaseValues.getSedanRate('day')
                     elif carList[carname]['type'] == 1:
@@ -702,6 +743,7 @@ for driver in driverrows:
     
 driverfile = 'driver_' + userInput.logonPath.replace('.', '_').replace('/', '_') + '.csv'
 shiftReport.writeFile(driverfile)
+shiftReport.writeOneFile("single_" + driverfile)
 print(str(shifnums) + " shifts written")
 templatefile.close()
 
